@@ -1,0 +1,55 @@
+{
+    "name": "zulficarjoy/socialite-azure-external-identities",
+    "description": "Microsoft Entra External ID (Azure External Identities) OAuth2/OIDC provider for Laravel Socialite",
+    "keywords": [
+        "laravel",
+        "oauth",
+        "oauth2",
+        "oidc",
+        "openid-connect",
+        "socialite",
+        "azure",
+        "active-directory",
+        "azure-ad",
+        "b2c",
+        "microsoft",
+        "entra",
+        "external-id",
+        "ciam",
+        "external-identities"
+    ],
+    "homepage": "https://github.com/zulficarjoy/socialite-azure-external-identities",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Zulficar Hasan Joy",
+            "homepage": "https://github.com/zulficarjoy",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "ext-json": "*",
+        "firebase/php-jwt": "^6.11|^7.0",
+        "guzzlehttp/guzzle": "^7.9",
+        "illuminate/cache": "^11.0|^12.0",
+        "illuminate/http": "^11.0|^12.0",
+        "illuminate/support": "^11.0|^12.0",
+        "socialiteproviders/manager": "^4.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "SocialiteProviders\\AzureExternalIdentities\\": "src/"
+        }
+    },
+    "extra": {
+        "socialiteproviders": {
+            "azure-ei": "SocialiteProviders\\AzureExternalIdentities\\AzureExternalIdentitiesExtendSocialite"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true
+    }
+}
