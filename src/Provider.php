@@ -35,7 +35,12 @@ class Provider extends AbstractProvider
 
     protected bool $usesNonce = true;
 
-    protected bool $usesPKCE = true;
+    /**
+     * Must remain untyped to match Laravel\Socialite\Two\AbstractProvider::$usesPKCE.
+     *
+     * @var bool
+     */
+    protected $usesPKCE = true;
 
     protected ?OpenIdConfigurationResolver $configurationResolver = null;
 

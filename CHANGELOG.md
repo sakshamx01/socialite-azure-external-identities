@@ -16,3 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional user flow / policy support
 - Logout URL helper
 - Laravel 11 and 12 support
+
+## [1.0.1] - 2026-07-31
+
+### Fixed
+
+- Untype `$usesPKCE` so the provider is compatible with Laravel Socialite 5.29+ (parent property is untyped)
+
