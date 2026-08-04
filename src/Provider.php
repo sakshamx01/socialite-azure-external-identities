@@ -66,18 +66,88 @@ class Provider extends AbstractProvider
         $state = null;
 
         if ($this->usesState()) {
-            $this->request->session()->put('state', $state = $this->getState());
+            // keep the in-flight OAuth state
+            $existingState = $this->request->session()->get('state');
+            $state = is_string($existingState) && $existingState !== ''
+                ? $existingState
+                : $this->getState();
+            $this->request->session()->put('state', $state);
         }
 
         if ($this->usesNonce()) {
-            $this->request->session()->put('nonce', $this->generateNonce());
+            $existingNonce = $this->request->session()->get('nonce');
+            $nonce = is_string($existingNonce) && $existingNonce !== ''
+                ? $existingNonce
+                : $this->generateNonce();
+            $this->request->session()->put('nonce', $nonce);
         }
 
         if ($this->usesPKCE()) {
-            $this->request->session()->put('code_verifier', $this->getCodeVerifier());
+            // reuse an in-flight verifier so a double-hit on /redirect cannot
+            // overwrite the session with a different value than code_challenge
+            $verifier = $this->resolveCodeVerifier();
+            $this->request->session()->put('code_verifier', $verifier);
+
+            if (is_string($state) && $state !== '') {
+                Cache::put($this->pkceCacheKey($state), $verifier, now()->addMinutes(10));
+            }
         }
 
         return new RedirectResponse($this->getAuthUrl($state));
+    }
+
+    /**
+     * @param  string  $code
+     * @return array<string, mixed>
+     */
+    protected function getTokenFields($code): array
+    {
+        $fields = parent::getTokenFields($code);
+
+        if ($this->usesPKCE()) {
+            $verifier = $fields['code_verifier'] ?? null;
+
+            if (! is_string($verifier) || $verifier === '') {
+                $state = $this->request->input('state');
+                if (is_string($state) && $state !== '') {
+                    $cached = Cache::pull($this->pkceCacheKey($state));
+                    if (is_string($cached) && $cached !== '') {
+                        $fields['code_verifier'] = $cached;
+                    }
+                }
+            } else {
+                $state = $this->request->input('state');
+                if (is_string($state) && $state !== '') {
+                    Cache::forget($this->pkceCacheKey($state));
+                }
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * prefer the existing session verifier so concurrent redirects stay consistent
+     */
+    protected function getCodeVerifier(): string
+    {
+        return $this->resolveCodeVerifier();
+    }
+
+    protected function resolveCodeVerifier(): string
+    {
+        $existing = $this->request->session()->get('code_verifier');
+
+        if (is_string($existing) && $existing !== '') {
+            return $existing;
+        }
+
+        return Str::random(96);
+    }
+
+    protected function pkceCacheKey(string $state): string
+    {
+        return 'azure-ei:pkce:' . $state;
     }
 
     /**
@@ -97,7 +167,7 @@ class Provider extends AbstractProvider
             return json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw new TokenValidationException(
-                'Token endpoint returned invalid JSON: '.$exception->getMessage(),
+                'Token endpoint returned invalid JSON: ' . $exception->getMessage(),
                 previous: $exception
             );
         }
@@ -145,13 +215,13 @@ class Provider extends AbstractProvider
      */
     public function getLogoutUrl(?string $postLogoutRedirectUri = null): string
     {
-        $logoutUrl = $this->getAuthority().'/oauth2/v2.0/logout';
+        $logoutUrl = $this->getAuthority() . '/oauth2/v2.0/logout';
 
         if ($postLogoutRedirectUri === null) {
             return $logoutUrl;
         }
 
-        return $logoutUrl.'?'.http_build_query([
+        return $logoutUrl . '?' . http_build_query([
             'post_logout_redirect_uri' => $postLogoutRedirectUri,
         ], '', '&', $this->encodingType);
     }
@@ -180,7 +250,7 @@ class Provider extends AbstractProvider
         $response = $this->getHttpClient()->get($userInfoEndpoint, [
             RequestOptions::HEADERS => [
                 'Accept' => 'application/json',
-                'Authorization' => 'Bearer '.$token,
+                'Authorization' => 'Bearer ' . $token,
             ],
             RequestOptions::PROXY => $this->getConfig('proxy'),
         ]);

@@ -27,7 +27,7 @@ class IdTokenVerifier
         }
 
         try {
-            $payload = JWT::decode($idToken, JWK::parseKeySet($jwks));
+            $payload = JWT::decode($idToken, JWK::parseKeySet($jwks, 'RS256'));
         } catch (ExpiredException $exception) {
             throw new TokenValidationException('The ID token has expired.', previous: $exception);
         } catch (SignatureInvalidException $exception) {
