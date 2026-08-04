@@ -23,3 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Untype `$usesPKCE` so the provider is compatible with Laravel Socialite 5.29+ (parent property is untyped)
 
+## [1.0.2] - 2026-08-04
+
+### Fixed/added
+
+- Microsoft JWKS keys often omit alg, and JWT 6+/7+ require it.
+- PKCE code_verifier + nonce session support added.
