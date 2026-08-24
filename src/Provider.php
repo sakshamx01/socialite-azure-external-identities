@@ -211,11 +211,11 @@ class Provider extends AbstractProvider
     }
 
     /**
-     * Build the Microsoft Entra External ID logout URL.
+     * Build the logout URL (e.g. https://{subdomain}.ciamlogin.com/{tenant_id}/oauth2/v2.0/logout).
      */
     public function getLogoutUrl(?string $postLogoutRedirectUri = null): string
     {
-        $logoutUrl = $this->getAuthority() . '/oauth2/v2.0/logout';
+        $logoutUrl = $this->getBaseAuthority() . '/oauth2/v2.0/logout';
 
         if ($postLogoutRedirectUri === null) {
             return $logoutUrl;
@@ -342,12 +342,25 @@ class Provider extends AbstractProvider
         return $this->getOpenIdConfiguration()['authorization_endpoint'];
     }
 
+    /**
+     * Get the full authority URL (e.g. https://{subdomain}.ciamlogin.com/{tenant_id}/v2.0).
+     */
     protected function getAuthority(): string
+    {
+        return $this->getBaseAuthority() . '/v2.0';
+    }
+
+    /**
+     * Get the base authority URL (e.g. https://{subdomain}.ciamlogin.com/{tenant_id}).
+     */
+    protected function getBaseAuthority(): string
     {
         $authority = $this->getConfig('authority');
 
         if (is_string($authority) && $authority !== '') {
-            return rtrim($authority, '/');
+            $trimmed = rtrim($authority, '/');
+
+            return preg_replace('/\/v2\.0$/i', '', $trimmed) ?? $trimmed;
         }
 
         $tenantSubdomain = $this->getConfig('tenant_subdomain');
@@ -362,7 +375,7 @@ class Provider extends AbstractProvider
         }
 
         return sprintf(
-            'https://%s.ciamlogin.com/%s/v2.0',
+            'https://%s.ciamlogin.com/%s',
             $tenantSubdomain,
             $tenantId
         );
