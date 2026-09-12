@@ -398,6 +398,22 @@ class Provider extends AbstractProvider
         return $this->usesNonce;
     }
 
+    /**
+     * Render the Entra External ID sign-in/sign-up page in the specified locale(s).
+     *
+     * Accepts a space-separated list of BCP47 language tags in preference order,
+     * e.g. 'fr-FR', 'de-DE en', 'ar'.
+     *
+     * Usage: Socialite::driver('azure-ei')->withUiLocales('fr-FR')->redirect();
+     *
+     * @see https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+     * @see https://learn.microsoft.com/en-us/entra/external-id/customers/concept-branding-customers
+     */
+    public function withUiLocales(string $locales): static
+    {
+        return $this->with(['ui_locales' => $locales]);
+    }
+
     protected function generateNonce(): string
     {
         return Str::random(40);
