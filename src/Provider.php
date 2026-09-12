@@ -398,6 +398,22 @@ class Provider extends AbstractProvider
         return $this->usesNonce;
     }
 
+    /**
+     * Skip Entra's home realm discovery page and send the user directly to the
+     * specified federated identity provider (e.g. 'google.com', 'facebook.com').
+     *
+     * Only effective when the Entra External ID tenant has the corresponding
+     * social identity provider configured.
+     *
+     * Usage: Socialite::driver('azure-ei')->withDomainHint('google.com')->redirect();
+     *
+     * @see https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow#request-an-authorization-code
+     */
+    public function withDomainHint(string $domainHint): static
+    {
+        return $this->with(['domain_hint' => $domainHint]);
+    }
+
     protected function generateNonce(): string
     {
         return Str::random(40);
