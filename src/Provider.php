@@ -398,6 +398,30 @@ class Provider extends AbstractProvider
         return $this->usesNonce;
     }
 
+    /**
+     * Request specific claims to be included in the ID token or UserInfo response.
+     *
+     * Accepts an array following the OIDC claims request format:
+     *
+     *   withClaims([
+     *       'id_token' => [
+     *           'email'             => ['essential' => true],
+     *           'extension_JobTitle' => null,   // custom CIAM attribute
+     *       ],
+     *   ])
+     *
+     * Useful for requesting custom attributes configured in Entra External ID
+     * without needing to add extra scopes.
+     *
+     * @param  array<string, mixed>  $claims
+     * @see https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter
+     * @see https://learn.microsoft.com/en-us/entra/external-id/customers/concept-custom-extensions
+     */
+    public function withClaims(array $claims): static
+    {
+        return $this->with(['claims' => json_encode($claims, JSON_THROW_ON_ERROR)]);
+    }
+
     protected function generateNonce(): string
     {
         return Str::random(40);
