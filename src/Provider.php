@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use JsonException;
 use SocialiteProviders\AzureExternalIdentities\Exceptions\InvalidStateException;
+use SocialiteProviders\AzureExternalIdentities\Exceptions\JwksSignatureException;
 use SocialiteProviders\AzureExternalIdentities\Exceptions\TokenValidationException;
 use SocialiteProviders\Manager\OAuth2\AbstractProvider;
 use SocialiteProviders\Manager\OAuth2\User;
@@ -307,21 +308,7 @@ class Provider extends AbstractProvider
     protected function resolveIdTokenClaims(string $idToken): array
     {
         if ($this->shouldVerifyIdToken()) {
-            $configuration = $this->getOpenIdConfiguration();
-
-            if (! isset($configuration['jwks_uri']) || ! is_string($configuration['jwks_uri'])) {
-                throw new TokenValidationException('OpenID configuration is missing a JWKS URI.');
-            }
-
-            $jwks = $this->configurationResolver()->resolveJwks($configuration['jwks_uri']);
-
-            return $this->idTokenVerifier()->verify(
-                idToken: $idToken,
-                clientId: $this->clientId,
-                expectedNonce: $this->getSessionNonce(),
-                jwks: $jwks,
-                validateNonce: $this->usesNonce(),
-            );
+            return $this->verifyIdTokenWithRotationRetry($idToken);
         }
 
         $claims = $this->idTokenVerifier()->decodeWithoutVerification($idToken);
@@ -335,6 +322,65 @@ class Provider extends AbstractProvider
         }
 
         return $claims;
+    }
+
+    /**
+     * Verify the ID token against the JWKS, automatically retrying once with
+     * freshly-fetched keys when a signature failure is detected.
+     *
+     * Microsoft Entra External ID rotates signing keys periodically (and may
+     * do so without notice during emergency events). If the cached JWKS is
+     * stale at the moment of rotation, every login attempt will fail until
+     * the 1-hour cache TTL expires naturally. This method detects that
+     * scenario — signalled by a JwksSignatureException — busts the JWKS
+     * cache, fetches the current key set from Microsoft, and retries
+     * verification exactly once.
+     *
+     * The retry is limited to a single attempt so that a genuinely forged or
+     * malformed token is not retried indefinitely and still surfaces an error.
+     *
+     * @return array<string, mixed>
+     */
+    protected function verifyIdTokenWithRotationRetry(string $idToken): array
+    {
+        $configuration = $this->getOpenIdConfiguration();
+
+        if (! isset($configuration['jwks_uri']) || ! is_string($configuration['jwks_uri'])) {
+            throw new TokenValidationException('OpenID configuration is missing a JWKS URI.');
+        }
+
+        $jwksUri = $configuration['jwks_uri'];
+        $resolver = $this->configurationResolver();
+
+        try {
+            $jwks = $resolver->resolveJwks($jwksUri);
+
+            return $this->idTokenVerifier()->verify(
+                idToken: $idToken,
+                clientId: $this->clientId,
+                expectedNonce: $this->getSessionNonce(),
+                jwks: $jwks,
+                validateNonce: $this->usesNonce(),
+            );
+        } catch (JwksSignatureException) {
+            // Signature verification failed against the cached key set.
+            // This is the hallmark of a key-rotation event: Microsoft has
+            // started signing tokens with a new key that our cache does not
+            // know about yet. Bust the cache and fetch the current key set.
+            $resolver->forgetJwks($jwksUri);
+            $freshJwks = $resolver->resolveJwks($jwksUri);
+
+            // Retry once with the fresh key set. If this also fails, the
+            // exception propagates to the caller unchanged — the token is
+            // genuinely invalid, not a rotation issue.
+            return $this->idTokenVerifier()->verify(
+                idToken: $idToken,
+                clientId: $this->clientId,
+                expectedNonce: $this->getSessionNonce(),
+                jwks: $freshJwks,
+                validateNonce: $this->usesNonce(),
+            );
+        }
     }
 
     protected function getAuthorizationEndpoint(): string

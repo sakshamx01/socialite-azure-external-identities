@@ -80,4 +80,27 @@ class OpenIdConfigurationResolver
             return $jwks;
         });
     }
+
+    /**
+     * Remove the cached JWKS for the given URI.
+     *
+     * Called by the provider after a JwksSignatureException to force a fresh
+     * key fetch on the next resolveJwks() call, recovering from a key-rotation
+     * event without waiting for the TTL to expire naturally.
+     */
+    public function forgetJwks(string $jwksUri): void
+    {
+        $this->cache->forget('azure_external_id_jwks_'.md5($jwksUri));
+    }
+
+    /**
+     * Remove the cached OpenID configuration for the given authority.
+     *
+     * Provided for symmetry with forgetJwks(); useful when the discovery
+     * document itself needs to be refreshed (e.g. endpoint URL changes).
+     */
+    public function forgetConfiguration(string $authority): void
+    {
+        $this->cache->forget('azure_external_id_oidc_'.md5($authority));
+    }
 }

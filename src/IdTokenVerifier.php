@@ -7,6 +7,7 @@ use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
 use Firebase\JWT\SignatureInvalidException;
 use SocialiteProviders\AzureExternalIdentities\Exceptions\InvalidNonceException;
+use SocialiteProviders\AzureExternalIdentities\Exceptions\JwksSignatureException;
 use SocialiteProviders\AzureExternalIdentities\Exceptions\TokenValidationException;
 
 class IdTokenVerifier
@@ -31,8 +32,20 @@ class IdTokenVerifier
         } catch (ExpiredException $exception) {
             throw new TokenValidationException('The ID token has expired.', previous: $exception);
         } catch (SignatureInvalidException $exception) {
-            throw new TokenValidationException('The ID token signature is invalid.', previous: $exception);
+            // Throw a specific exception so the provider can detect a potential
+            // key-rotation event and perform a single cache-busting retry.
+            throw new JwksSignatureException('The ID token signature is invalid.', previous: $exception);
         } catch (\Throwable $exception) {
+            // JWK::parseKeySet throws an \InvalidArgumentException when the
+            // requested kid is not present in the key set — treat that as a
+            // signature/key-lookup failure so the retry logic is triggered.
+            if ($exception instanceof \InvalidArgumentException) {
+                throw new JwksSignatureException(
+                    'The ID token references an unknown key ID (kid): '.$exception->getMessage(),
+                    previous: $exception
+                );
+            }
+
             throw new TokenValidationException(
                 'Unable to validate the ID token: '.$exception->getMessage(),
                 previous: $exception
