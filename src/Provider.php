@@ -212,18 +212,32 @@ class Provider extends AbstractProvider
 
     /**
      * Build the logout URL (e.g. https://{subdomain}.ciamlogin.com/{tenant_id}/oauth2/v2.0/logout).
+     *
+     * Providing $idTokenHint (the raw id_token string from the user's session)
+     * allows Entra to silently sign the user out without showing an interstitial
+     * confirmation page.
+     *
+     * @see https://learn.microsoft.com/en-us/entra/external-id/customers/sample-web-app-dotnet-sign-in#sign-out
      */
-    public function getLogoutUrl(?string $postLogoutRedirectUri = null): string
+    public function getLogoutUrl(?string $postLogoutRedirectUri = null, ?string $idTokenHint = null): string
     {
         $logoutUrl = $this->getBaseAuthority() . '/oauth2/v2.0/logout';
 
-        if ($postLogoutRedirectUri === null) {
+        $params = [];
+
+        if ($postLogoutRedirectUri !== null) {
+            $params['post_logout_redirect_uri'] = $postLogoutRedirectUri;
+        }
+
+        if ($idTokenHint !== null) {
+            $params['id_token_hint'] = $idTokenHint;
+        }
+
+        if (empty($params)) {
             return $logoutUrl;
         }
 
-        return $logoutUrl . '?' . http_build_query([
-            'post_logout_redirect_uri' => $postLogoutRedirectUri,
-        ], '', '&', $this->encodingType);
+        return $logoutUrl . '?' . http_build_query($params, '', '&', $this->encodingType);
     }
 
     protected function getAuthUrl($state): string
