@@ -398,6 +398,24 @@ class Provider extends AbstractProvider
         return $this->usesNonce;
     }
 
+    /**
+     * Request a specific authentication context class reference (ACR) level.
+     *
+     * Used to trigger step-up authentication mid-session — for example,
+     * requiring MFA before the user accesses a sensitive resource.
+     *
+     * After a successful callback, validate the returned acr claim matches
+     * the requested value using the raw claims on the Socialite user object.
+     *
+     * Usage: Socialite::driver('azure-ei')->withAcrValues('urn:microsoft:policies:mfa')->redirect();
+     *
+     * @see https://learn.microsoft.com/en-us/entra/identity-platform/developer-glossary#authentication-context-class-reference
+     */
+    public function withAcrValues(string $acrValues): static
+    {
+        return $this->with(['acr_values' => $acrValues]);
+    }
+
     protected function generateNonce(): string
     {
         return Str::random(40);
