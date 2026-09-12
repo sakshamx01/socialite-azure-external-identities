@@ -58,6 +58,7 @@ class Provider extends AbstractProvider
             'policy',
             'verify_id_token',
             'proxy',
+            'cache_store',
         ];
     }
 
@@ -446,7 +447,9 @@ class Provider extends AbstractProvider
     {
         return $this->configurationResolver ??= new OpenIdConfigurationResolver(
             $this->getHttpClient(),
-            Cache::store()
+            // Use a dedicated cache store when configured — isolates OIDC/JWKS
+            // data from the rest of the application cache to avoid eviction.
+            Cache::store($this->getConfig('cache_store') ?: null)
         );
     }
 
