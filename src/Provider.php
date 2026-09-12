@@ -173,6 +173,43 @@ class Provider extends AbstractProvider
         }
     }
 
+    /**
+     * Exchange a refresh token for a new set of tokens.
+     *
+     * Returns the full token response array from the token endpoint, which
+     * includes access_token, refresh_token (if offline_access scope was
+     * granted), id_token, expires_in, and token_type.
+     *
+     * Usage:
+     *   $tokens = Socialite::driver('azure-ei')->refreshToken($user->refreshToken);
+     *
+     * @return array<string, mixed>
+     * @see https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow#refresh-the-access-token
+     */
+    public function refreshToken(string $refreshToken): array
+    {
+        $response = $this->getHttpClient()->post($this->getTokenUrl(), [
+            RequestOptions::HEADERS => ['Accept' => 'application/json'],
+            RequestOptions::FORM_PARAMS => [
+                'grant_type'    => 'refresh_token',
+                'client_id'     => $this->clientId,
+                'client_secret' => $this->clientSecret,
+                'refresh_token' => $refreshToken,
+                'scope'         => implode($this->scopeSeparator, $this->getScopes()),
+            ],
+            RequestOptions::PROXY => $this->getConfig('proxy'),
+        ]);
+
+        try {
+            return json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new TokenValidationException(
+                'Token endpoint returned invalid JSON during token refresh: ' . $exception->getMessage(),
+                previous: $exception
+            );
+        }
+    }
+
     public function user()
     {
         if ($this->user) {
