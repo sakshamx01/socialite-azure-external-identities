@@ -93,6 +93,13 @@ class Provider extends AbstractProvider
             }
         }
 
+        // Persist max_age so the callback can enforce auth_time validation
+        // (OIDC spec §3.1.3.7, rule 11).
+        $maxAge = $this->request->input('max_age') ?? ($this->with['max_age'] ?? null);
+        if (is_numeric($maxAge)) {
+            $this->request->session()->put('max_age', (int) $maxAge);
+        }
+
         return new RedirectResponse($this->getAuthUrl($state));
     }
 
@@ -321,6 +328,7 @@ class Provider extends AbstractProvider
                 expectedNonce: $this->getSessionNonce(),
                 jwks: $jwks,
                 validateNonce: $this->usesNonce(),
+                maxAge: $this->getSessionMaxAge(),
             );
         }
 
@@ -408,6 +416,17 @@ class Provider extends AbstractProvider
         $nonce = $this->request->session()->get('nonce');
 
         return is_string($nonce) && $nonce !== '' ? $nonce : null;
+    }
+
+    /**
+     * Retrieve max_age from the session (stored during redirect()).
+     * Returns null when max_age was not requested.
+     */
+    protected function getSessionMaxAge(): ?int
+    {
+        $maxAge = $this->request->session()->pull('max_age');
+
+        return is_int($maxAge) ? $maxAge : null;
     }
 
     /**

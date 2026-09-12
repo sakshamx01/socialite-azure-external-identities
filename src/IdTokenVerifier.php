@@ -21,6 +21,7 @@ class IdTokenVerifier
         ?string $expectedNonce,
         array $jwks,
         bool $validateNonce = true,
+        ?int $maxAge = null,
     ): array {
         if ($expectedNonce === null && $validateNonce) {
             throw new InvalidNonceException('No nonce was found in the current session.');
@@ -42,6 +43,10 @@ class IdTokenVerifier
         $claims = json_decode(json_encode($payload, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR);
 
         $this->assertAudience($claims, $clientId);
+
+        if ($maxAge !== null) {
+            $this->assertAuthTime($claims, $maxAge);
+        }
 
         if ($validateNonce) {
             $this->assertNonce($claims, $expectedNonce);
@@ -74,6 +79,33 @@ class IdTokenVerifier
         }
 
         return $claims;
+    }
+
+    /**
+     * Enforce the max_age parameter by validating the auth_time claim.
+     *
+     * When max_age is included in the authorization request, Entra adds an
+     * auth_time claim to the token. The OIDC spec (§3.1.3.7, rule 11)
+     * requires the RP to verify: now() <= auth_time + max_age.
+     *
+     * @param  array<string, mixed>  $claims
+     */
+    private function assertAuthTime(array $claims, int $maxAge): void
+    {
+        $authTime = $claims['auth_time'] ?? null;
+
+        if (! is_int($authTime)) {
+            throw new TokenValidationException(
+                'The ID token is missing the auth_time claim required by max_age validation.'
+            );
+        }
+
+        if (time() > $authTime + $maxAge) {
+            throw new TokenValidationException(
+                'The user authentication is too old to satisfy the max_age constraint. '
+                ."auth_time={$authTime}, max_age={$maxAge}s, now=".time().'.'
+            );
+        }
     }
 
     /**
