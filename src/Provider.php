@@ -11,6 +11,7 @@ use SocialiteProviders\AzureExternalIdentities\Exceptions\InvalidStateException;
 use SocialiteProviders\AzureExternalIdentities\Exceptions\TokenValidationException;
 use SocialiteProviders\Manager\OAuth2\AbstractProvider;
 use SocialiteProviders\Manager\OAuth2\User;
+use SocialiteProviders\AzureExternalIdentities\AzureEiUser;
 
 /**
  * Microsoft Entra External ID (CIAM) provider for Laravel Socialite.
@@ -261,17 +262,17 @@ class Provider extends AbstractProvider
     /**
      * @param  array<string, mixed>  $user
      */
-    protected function mapUserToObject(array $user): User
+    protected function mapUserToObject(array $user): AzureEiUser
     {
-        return (new User())->setRaw($user)->map([
-            'id' => $user['oid'] ?? $user['sub'] ?? null,
-            'nickname' => $user['preferred_username'] ?? null,
-            'name' => $user['name'] ?? null,
-            'email' => $this->resolveEmail($user),
-            'avatar' => null,
-            'given_name' => $user['given_name'] ?? null,
+        return (new AzureEiUser())->setRaw($user)->map([
+            'id'          => $user['oid'] ?? $user['sub'] ?? null,
+            'nickname'    => $user['preferred_username'] ?? null,
+            'name'        => $user['name'] ?? null,
+            'email'       => $this->resolveEmail($user),
+            'avatar'      => null,
+            'given_name'  => $user['given_name'] ?? null,
             'family_name' => $user['family_name'] ?? null,
-            'tenant_id' => $user['tid'] ?? null,
+            'tenant_id'   => $user['tid'] ?? null,
         ]);
     }
 
