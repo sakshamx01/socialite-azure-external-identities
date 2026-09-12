@@ -321,6 +321,7 @@ class Provider extends AbstractProvider
                 expectedNonce: $this->getSessionNonce(),
                 jwks: $jwks,
                 validateNonce: $this->usesNonce(),
+                expectedPolicy: $this->getPolicy(),
             );
         }
 

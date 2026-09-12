@@ -21,6 +21,7 @@ class IdTokenVerifier
         ?string $expectedNonce,
         array $jwks,
         bool $validateNonce = true,
+        ?string $expectedPolicy = null,
     ): array {
         if ($expectedNonce === null && $validateNonce) {
             throw new InvalidNonceException('No nonce was found in the current session.');
@@ -42,6 +43,10 @@ class IdTokenVerifier
         $claims = json_decode(json_encode($payload, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR);
 
         $this->assertAudience($claims, $clientId);
+
+        if ($expectedPolicy !== null) {
+            $this->assertPolicy($claims, $expectedPolicy);
+        }
 
         if ($validateNonce) {
             $this->assertNonce($claims, $expectedNonce);
@@ -74,6 +79,31 @@ class IdTokenVerifier
         }
 
         return $claims;
+    }
+
+    /**
+     * Validate the tfp (trust framework policy) or acr claim matches the
+     * expected policy. Entra External ID includes tfp in tokens issued via
+     * named user flows; acr is the fallback for older tenants.
+     *
+     * @param  array<string, mixed>  $claims
+     */
+    private function assertPolicy(array $claims, string $expectedPolicy): void
+    {
+        // tfp is the primary claim; fall back to acr for older B2C-style tenants.
+        $actualPolicy = $claims['tfp'] ?? $claims['acr'] ?? null;
+
+        if (! is_string($actualPolicy)) {
+            throw new TokenValidationException(
+                "The ID token is missing a policy claim (tfp/acr). Expected: '{$expectedPolicy}'."
+            );
+        }
+
+        if (strcasecmp($actualPolicy, $expectedPolicy) !== 0) {
+            throw new TokenValidationException(
+                "The ID token policy does not match. Got: '{$actualPolicy}', expected: '{$expectedPolicy}'."
+            );
+        }
     }
 
     /**
