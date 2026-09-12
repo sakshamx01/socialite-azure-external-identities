@@ -398,6 +398,21 @@ class Provider extends AbstractProvider
         return $this->usesNonce;
     }
 
+    /**
+     * Pre-fill the email/username field on the Entra External ID sign-in page.
+     *
+     * Improves UX in "continue as" flows where the app already knows the user's
+     * email (e.g. after they type it in a local form before being redirected).
+     *
+     * Usage: Socialite::driver('azure-ei')->withLoginHint('user@example.com')->redirect();
+     *
+     * @see https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow#request-an-authorization-code
+     */
+    public function withLoginHint(string $loginHint): static
+    {
+        return $this->with(['login_hint' => $loginHint]);
+    }
+
     protected function generateNonce(): string
     {
         return Str::random(40);
