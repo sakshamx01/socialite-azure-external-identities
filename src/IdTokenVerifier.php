@@ -27,6 +27,14 @@ class IdTokenVerifier
         }
 
         try {
+            // Fast-fail on unknown kid before attempting full decode.
+            // If the kid in the JWT header does not exist in the JWKS, the
+            // cached key set is stale (key rotation) or the token is forged.
+            $kid = $this->extractKidFromHeader($idToken);
+            if ($kid !== null) {
+                $this->assertKidExists($kid, $jwks);
+            }
+
             $payload = JWT::decode($idToken, JWK::parseKeySet($jwks, 'RS256'));
         } catch (ExpiredException $exception) {
             throw new TokenValidationException('The ID token has expired.', previous: $exception);
@@ -74,6 +82,52 @@ class IdTokenVerifier
         }
 
         return $claims;
+    }
+
+    /**
+     * Extract the kid (key ID) from the JWT header without full decoding.
+     * Returns null if the token is malformed or the header has no kid.
+     */
+    private function extractKidFromHeader(string $idToken): ?string
+    {
+        $parts = explode('.', $idToken);
+        if (count($parts) !== 3) {
+            return null;
+        }
+
+        try {
+            $header = json_decode(
+                base64_decode(strtr($parts[0], '-_', '+/'), true) ?: '',
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return isset($header['kid']) && is_string($header['kid']) ? $header['kid'] : null;
+    }
+
+    /**
+     * Assert that the requested kid is present in the JWKS key set.
+     *
+     * @param  array<string, mixed>  $jwks
+     */
+    private function assertKidExists(string $kid, array $jwks): void
+    {
+        $keys = $jwks['keys'] ?? [];
+
+        foreach ($keys as $key) {
+            if (isset($key['kid']) && $key['kid'] === $kid) {
+                return;
+            }
+        }
+
+        throw new TokenValidationException(
+            "The ID token references key ID '{$kid}' which is not present in the JWKS. "
+            .'The signing key may have been rotated.'
+        );
     }
 
     /**
