@@ -398,6 +398,32 @@ class Provider extends AbstractProvider
         return $this->usesNonce;
     }
 
+    /**
+     * Set the OIDC prompt parameter to control the sign-in experience.
+     *
+     * Supported values:
+     *   - 'login'          Force re-authentication even if user has an SSO session.
+     *   - 'none'           Silent token acquisition; error if interaction is needed.
+     *   - 'consent'        Force the consent screen to be shown.
+     *   - 'select_account' Show the account picker.
+     *
+     * Usage: Socialite::driver('azure-ei')->withPrompt('login')->redirect();
+     *
+     * @see https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow#request-an-authorization-code
+     */
+    public function withPrompt(string $prompt): static
+    {
+        $allowed = ['login', 'none', 'consent', 'select_account'];
+
+        if (! in_array($prompt, $allowed, true)) {
+            throw new \InvalidArgumentException(
+                "Invalid prompt value '{$prompt}'. Allowed: ".implode(', ', $allowed).'.'
+            );
+        }
+
+        return $this->with(['prompt' => $prompt]);
+    }
+
     protected function generateNonce(): string
     {
         return Str::random(40);
