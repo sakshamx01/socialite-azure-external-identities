@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use JsonException;
 use SocialiteProviders\AzureExternalIdentities\Exceptions\InvalidStateException;
+use SocialiteProviders\AzureExternalIdentities\Exceptions\ConditionalAccessException;
 use SocialiteProviders\AzureExternalIdentities\Exceptions\TokenValidationException;
 use SocialiteProviders\Manager\OAuth2\AbstractProvider;
 use SocialiteProviders\Manager\OAuth2\User;
@@ -164,13 +165,39 @@ class Provider extends AbstractProvider
         ]);
 
         try {
-            return json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+            $body = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw new TokenValidationException(
                 'Token endpoint returned invalid JSON: ' . $exception->getMessage(),
                 previous: $exception
             );
         }
+
+        // Detect Conditional Access claims challenge.
+        // Entra returns error=interaction_required with a claims parameter when
+        // a CA policy (MFA, compliant device, etc.) has not been satisfied.
+        if (isset($body['error']) && $this->isConditionalAccessError($body)) {
+            $claimsChallenge = $body['claims'] ?? $body['error_description'] ?? '';
+            throw new ConditionalAccessException(
+                'Conditional Access policy requires additional action: '.($body['error_description'] ?? $body['error']),
+                claimsChallenge: is_string($claimsChallenge) ? $claimsChallenge : '',
+            );
+        }
+
+        return $body;
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     */
+    private function isConditionalAccessError(array $body): bool
+    {
+        $error = $body['error'] ?? '';
+
+        // interaction_required with a claims hint is the canonical CA signal.
+        // insufficient_claims is returned by some resource servers.
+        return in_array($error, ['interaction_required', 'insufficient_claims'], true)
+            && (isset($body['claims']) || str_contains($body['error_description'] ?? '', 'AADSTS'));
     }
 
     public function user()
