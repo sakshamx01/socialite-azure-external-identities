@@ -9,11 +9,13 @@ use SocialiteProviders\AzureExternalIdentities\Exceptions\OpenIdConfigurationExc
 
 class OpenIdConfigurationResolver
 {
-    private const CACHE_TTL_SECONDS = 3600;
+    private const DEFAULT_TTL_SECONDS = 3600;
 
     public function __construct(
         private readonly ClientInterface $httpClient,
         private readonly CacheRepository $cache,
+        private readonly int $oidcCacheTtl = self::DEFAULT_TTL_SECONDS,
+        private readonly int $jwksCacheTtl = self::DEFAULT_TTL_SECONDS,
     ) {
     }
 
@@ -24,7 +26,7 @@ class OpenIdConfigurationResolver
     {
         $cacheKey = 'azure_external_id_oidc_'.md5($authority);
 
-        return $this->cache->remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($authority) {
+        return $this->cache->remember($cacheKey, $this->oidcCacheTtl, function () use ($authority) {
             $url = rtrim($authority, '/').'/.well-known/openid-configuration';
 
             try {
@@ -57,7 +59,7 @@ class OpenIdConfigurationResolver
     {
         $cacheKey = 'azure_external_id_jwks_'.md5($jwksUri);
 
-        return $this->cache->remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($jwksUri) {
+        return $this->cache->remember($cacheKey, $this->jwksCacheTtl, function () use ($jwksUri) {
             try {
                 $response = $this->httpClient->request('GET', $jwksUri);
                 $jwks = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);

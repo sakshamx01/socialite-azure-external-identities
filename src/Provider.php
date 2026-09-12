@@ -58,6 +58,8 @@ class Provider extends AbstractProvider
             'policy',
             'verify_id_token',
             'proxy',
+            'oidc_cache_ttl',
+            'jwks_cache_ttl',
         ];
     }
 
@@ -446,7 +448,9 @@ class Provider extends AbstractProvider
     {
         return $this->configurationResolver ??= new OpenIdConfigurationResolver(
             $this->getHttpClient(),
-            Cache::store()
+            Cache::store(),
+            oidcCacheTtl: (int) $this->getConfig('oidc_cache_ttl', 3600),
+            jwksCacheTtl: (int) $this->getConfig('jwks_cache_ttl', 3600),
         );
     }
 
