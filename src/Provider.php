@@ -58,6 +58,7 @@ class Provider extends AbstractProvider
             'policy',
             'verify_id_token',
             'proxy',
+            'token_freshness_ttl',
         ];
     }
 
@@ -321,6 +322,7 @@ class Provider extends AbstractProvider
                 expectedNonce: $this->getSessionNonce(),
                 jwks: $jwks,
                 validateNonce: $this->usesNonce(),
+                freshnessWindowSeconds: $this->getTokenFreshnessWindow(),
             );
         }
 
@@ -391,6 +393,16 @@ class Provider extends AbstractProvider
     protected function shouldVerifyIdToken(): bool
     {
         return (bool) $this->getConfig('verify_id_token', true);
+    }
+
+    /**
+     * Return the configured token freshness window in seconds, or null to skip.
+     */
+    protected function getTokenFreshnessWindow(): ?int
+    {
+        $ttl = $this->getConfig('token_freshness_ttl');
+
+        return is_numeric($ttl) ? (int) $ttl : null;
     }
 
     protected function usesNonce(): bool

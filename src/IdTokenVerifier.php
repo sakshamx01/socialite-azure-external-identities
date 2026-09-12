@@ -21,6 +21,7 @@ class IdTokenVerifier
         ?string $expectedNonce,
         array $jwks,
         bool $validateNonce = true,
+        ?int $freshnessWindowSeconds = null,
     ): array {
         if ($expectedNonce === null && $validateNonce) {
             throw new InvalidNonceException('No nonce was found in the current session.');
@@ -42,6 +43,10 @@ class IdTokenVerifier
         $claims = json_decode(json_encode($payload, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR);
 
         $this->assertAudience($claims, $clientId);
+
+        if ($freshnessWindowSeconds !== null) {
+            $this->assertTokenFreshness($claims, $freshnessWindowSeconds);
+        }
 
         if ($validateNonce) {
             $this->assertNonce($claims, $expectedNonce);
@@ -74,6 +79,26 @@ class IdTokenVerifier
         }
 
         return $claims;
+    }
+
+    /**
+     * @param  array<string, mixed>  $claims
+     */
+    private function assertTokenFreshness(array $claims, int $freshnessWindowSeconds): void
+    {
+        $iat = $claims['iat'] ?? null;
+
+        if (! is_int($iat)) {
+            throw new TokenValidationException('The ID token is missing the iat (issued-at) claim.');
+        }
+
+        $age = time() - $iat;
+
+        if ($age > $freshnessWindowSeconds) {
+            throw new TokenValidationException(
+                "The ID token is too old (age: {$age}s, max: {$freshnessWindowSeconds}s). It may be a replay."
+            );
+        }
     }
 
     /**
